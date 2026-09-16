@@ -9,7 +9,7 @@
 <div class="container-fluid py-3">
     <div class="mb-4">
         <h2>Production Plan Balancing</h2>
-        <p class="text-muted">Input slot produksi untuk dihitung penyeimbangan kuantitasnya (perbedaan maksimal 1 untuk slot aktif).</p>
+        <p class="text-muted">Masukkan slot produksi untuk menghitung penyeimbangan kuantitas (perbedaan kuantitas antar slot aktif maksimal 1).</p>
     </div>
 
     @if (!string.IsNullOrEmpty(errorMessage))
@@ -104,24 +104,20 @@
     {
         <div class="card border-success">
             <div class="card-header bg-success text-white fw-bold d-flex justify-content-between align-items-center">
-                <span>Hasil Balancing Rencana Produksi</span>
-                <span class="badge bg-light text-dark">ID: @resultPlanning.PlanningId</span>
+                <span>Hasil Penyeimbangan Rencana Produksi</span>
+                <span class="badge bg-light text-dark">Candidate: @resultPlanning.CandidateToken</span>
             </div>
             <div class="card-body">
                 <div class="row mb-3">
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <small class="text-muted d-block">Request Code</small>
                         <span class="fw-bold fs-6">@resultPlanning.RequestCode</span>
                     </div>
-                    <div class="col-md-3">
-                        <small class="text-muted d-block">Status</small>
-                        <span class="badge bg-primary">@resultPlanning.Status</span>
-                    </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <small class="text-muted d-block">Original Total</small>
                         <span class="fw-bold fs-6 text-secondary">@resultPlanning.Slots.Sum(s => s.OriginalQuantity)</span>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <small class="text-muted d-block">Balanced Total</small>
                         <span class="fw-bold fs-6 text-success">@resultPlanning.Slots.Sum(s => s.BalancedQuantity)</span>
                     </div>

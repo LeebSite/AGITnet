@@ -191,7 +191,7 @@ public class PlanningApiClient : IPlanningApiClient
         }
         catch
         {
-            // Fallback if content is not JSON
+            // Fallback jika respon bukan format JSON
         }
 
         return $"Error HTTP {(int)response.StatusCode}: {response.ReasonPhrase}";
