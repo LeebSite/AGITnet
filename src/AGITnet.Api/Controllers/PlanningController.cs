@@ -6,7 +6,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace AGITnet.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/planning")]
+[Route("api/plannings")]
 public class PlanningController : ControllerBase
 {
     private readonly IPlanningService _planningService;

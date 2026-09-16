@@ -1,0 +1,130 @@
+@page "/history"
+@rendermode InteractiveServer
+@inject IPlanningApiClient ApiClient
+@inject NavigationManager Navigation
+
+<PageTitle>Riwayat Planning - AGITnet</PageTitle>
+
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>Riwayat Production Planning</h2>
+            <p class="text-muted mb-0">Daftar seluruh rencana produksi yang telah diproses dan disimpan.</p>
+        </div>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="LoadHistoryAsync" disabled="@isLoading">
+            <span class="bi bi-arrow-clockwise me-1"></span> Refresh
+        </button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            <strong>Gagal Memuat:</strong> @errorMessage
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="text-muted mt-2">Memuat data riwayat planning...</p>
+        </div>
+    }
+    else if (plannings == null || plannings.Count == 0)
+    {
+        <div class="card text-center p-5 bg-light">
+            <div class="card-body">
+                <h5 class="card-title text-muted">Belum ada riwayat planning</h5>
+                <p class="card-text text-muted">Silakan buat rencana produksi baru melalui menu Planning Balancer.</p>
+                <a href="" class="btn btn-primary mt-2">Buat Planning Baru</a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-header bg-light fw-bold d-flex justify-content-between align-items-center">
+                <span>Daftar Riwayat (@plannings.Count item)</span>
+                <span class="small text-muted">Diurutkan berdasarkan yang terbaru</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover table-striped align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Request Code</th>
+                            <th>Tanggal Buat</th>
+                            <th>Status</th>
+                            <th class="text-end">Original Total</th>
+                            <th class="text-end">Balanced Total</th>
+                            <th class="text-center" style="width: 100px;">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in plannings)
+                        {
+                            var originalTotal = item.Slots.Sum(s => s.OriginalQuantity);
+                            var balancedTotal = item.Slots.Sum(s => s.BalancedQuantity);
+                            <tr>
+                                <td>@item.PlanningId</td>
+                                <td class="fw-bold">@item.RequestCode</td>
+                                <td>@item.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm:ss")</td>
+                                <td>
+                                    <span class="badge bg-primary">@item.Status</span>
+                                </td>
+                                <td class="text-end text-secondary fw-bold">@originalTotal</td>
+                                <td class="text-end text-success fw-bold">@balancedTotal</td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => ViewDetail(item.PlanningId)">
+                                        Detail
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<PlanningResponse>? plannings;
+    private string? errorMessage;
+    private bool isLoading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadHistoryAsync();
+    }
+
+    private async Task LoadHistoryAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var response = await ApiClient.GetAllPlanningsAsync();
+            if (response.IsSuccess && response.Data != null)
+            {
+                plannings = response.Data.OrderByDescending(p => p.CreatedAt).ToList();
+            }
+            else
+            {
+                errorMessage = response.ErrorMessage ?? "Gagal mengambil data dari server.";
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ViewDetail(int id)
+    {
+        Navigation.NavigateTo($"detail/{id}");
+    }
+}

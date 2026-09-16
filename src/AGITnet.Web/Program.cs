@@ -1,5 +1,5 @@
 using AGITnet.Web.Components;
-using Microsoft.AspNetCore.Builder;
+using AGITnet.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,23 +7,28 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Configure HttpClient for API Communication
+var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5000/";
+builder.Services.AddHttpClient<IPlanningApiClient, PlanningApiClient>(client =>
+{
+    client.BaseAddress = new Uri(apiBaseUrl);
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
-    app.UseStatusCodePagesWithReExecute("/not-found");
+
+app.UseStatusCodePagesWithReExecute("/not-found");
 app.UseHttpsRedirection();
 
-    app.UseAntiforgery();
+app.UseAntiforgery();
+app.UseStaticFiles();
 
-    // MapStaticAssets extension was not found in this project; use the built-in
-    // static files middleware instead so wwwroot assets are served.
-    app.UseStaticFiles();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

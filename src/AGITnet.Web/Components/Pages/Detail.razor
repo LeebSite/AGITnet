@@ -1,0 +1,166 @@
+@page "/detail/{Id:int}"
+@page "/planning/{Id:int}"
+@rendermode InteractiveServer
+@inject IPlanningApiClient ApiClient
+@inject NavigationManager Navigation
+
+<PageTitle>Detail Planning #@Id - AGITnet</PageTitle>
+
+<div class="container-fluid py-3">
+    <div class="mb-4 d-flex justify-content-between align-items-center">
+        <div>
+            <h2>Detail Rencana Produksi</h2>
+            <p class="text-muted mb-0">Informasi detail dan penyeimbangan slot produksi #@Id.</p>
+        </div>
+        <button class="btn btn-outline-secondary" @onclick="GoBack">
+            &larr; Kembali ke Riwayat
+        </button>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="text-muted mt-2">Memuat detail planning...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage) || planning == null)
+    {
+        <div class="card text-center p-5 bg-light">
+            <div class="card-body">
+                <h5 class="card-title text-danger">Planning Tidak Ditemukan</h5>
+                <p class="card-text text-muted">@(errorMessage ?? $"Rencana produksi dengan ID {Id} tidak ditemukan.")</p>
+                <button class="btn btn-primary mt-2" @onclick="GoBack">Kembali ke Daftar Riwayat</button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card mb-4 border-primary">
+            <div class="card-header bg-primary text-white fw-bold d-flex justify-content-between align-items-center">
+                <span>Informasi Rencana Produksi</span>
+                <span>ID: @planning.PlanningId</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <small class="text-muted d-block">Request Code</small>
+                        <span class="fw-bold fs-5">@planning.RequestCode</span>
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted d-block">Candidate Token</small>
+                        <span class="badge bg-dark font-monospace fs-6">@planning.CandidateToken</span>
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted d-block">Tanggal Pembuatan</small>
+                        <span class="fw-bold">@planning.CreatedAt.ToLocalTime().ToString("dd MMMM yyyy HH:mm:ss")</span>
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted d-block">Status</small>
+                        <span class="badge bg-primary fs-6">@planning.Status</span>
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted d-block">Original Total Quantity</small>
+                        <span class="fw-bold fs-5 text-secondary">@planning.Slots.Sum(s => s.OriginalQuantity)</span>
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted d-block">Balanced Total Quantity</small>
+                        <span class="fw-bold fs-5 text-success">@planning.Slots.Sum(s => s.BalancedQuantity)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-light fw-bold">
+                Daftar Slot Produksi (@planning.Slots.Count Slot)
+            </div>
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="width: 80px;">Order</th>
+                            <th>Nama Slot</th>
+                            <th class="text-end" style="width: 200px;">Original Quantity</th>
+                            <th class="text-end" style="width: 200px;">Balanced Quantity</th>
+                            <th class="text-center" style="width: 150px;">Status Slot</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var slot in planning.Slots.OrderBy(s => s.SlotOrder))
+                        {
+                            <tr class="@(!slot.IsActive ? "table-secondary text-muted" : "")">
+                                <td class="text-center fw-bold">@slot.SlotOrder</td>
+                                <td class="fw-bold">@slot.SlotName</td>
+                                <td class="text-end">@slot.OriginalQuantity</td>
+                                <td class="text-end fw-bold text-success">@slot.BalancedQuantity</td>
+                                <td class="text-center">
+                                    @if (slot.IsActive)
+                                    {
+                                        <span class="badge bg-success">Aktif</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Tidak Aktif (0)</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot class="table-light fw-bold">
+                        <tr>
+                            <td colspan="2" class="text-end">TOTAL</td>
+                            <td class="text-end">@planning.Slots.Sum(s => s.OriginalQuantity)</td>
+                            <td class="text-end text-success">@planning.Slots.Sum(s => s.BalancedQuantity)</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private PlanningResponse? planning;
+    private string? errorMessage;
+    private bool isLoading;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadDetailAsync();
+    }
+
+    private async Task LoadDetailAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var response = await ApiClient.GetPlanningByIdAsync(Id);
+            if (response.IsSuccess && response.Data != null)
+            {
+                planning = response.Data;
+            }
+            else
+            {
+                errorMessage = response.ErrorMessage ?? $"Planning dengan ID {Id} tidak ditemukan.";
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("history");
+    }
+}

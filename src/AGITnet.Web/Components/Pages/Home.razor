@@ -1,7 +1,291 @@
-﻿@page "/"
+@page "/"
+@page "/planning"
+@rendermode InteractiveServer
+@inject IPlanningApiClient ApiClient
+@inject NavigationManager Navigation
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Production Plan Balancing - AGITnet</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="container-fluid py-3">
+    <div class="mb-4">
+        <h2>Production Plan Balancing</h2>
+        <p class="text-muted">Input slot produksi untuk dihitung penyeimbangan kuantitasnya (perbedaan maksimal 1 untuk slot aktif).</p>
+    </div>
 
-Welcome to your new app.
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <strong>Perhatian:</strong> @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="card mb-4">
+        <div class="card-header bg-light fw-bold">
+            Form Rencana Produksi
+        </div>
+        <div class="card-body">
+            <EditForm Model="requestModel" OnValidSubmit="HandleSubmitAsync">
+                <DataAnnotationsValidator />
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Request Code <span class="text-danger">*</span></label>
+                    <InputText class="form-control" @bind-Value="requestModel.RequestCode" placeholder="Contoh: REQ-2026-001" />
+                    <ValidationMessage For="() => requestModel.RequestCode" class="text-danger small" />
+                </div>
+
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label fw-bold mb-0">Daftar Slot Produksi <span class="text-danger">*</span></label>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="AddSlot">
+                            + Tambah Slot
+                        </button>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 50px;">#</th>
+                                    <th>Nama Slot</th>
+                                    <th style="width: 180px;">Original Quantity</th>
+                                    <th style="width: 80px;">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (int i = 0; i < requestModel.Slots.Count; i++)
+                                {
+                                    var index = i;
+                                    var slot = requestModel.Slots[index];
+                                    <tr>
+                                        <td class="text-center fw-bold">@(index + 1)</td>
+                                        <td>
+                                            <InputText class="form-control form-control-sm" @bind-Value="slot.SlotName" placeholder="Nama Slot" />
+                                        </td>
+                                        <td>
+                                            <InputNumber class="form-control form-control-sm" @bind-Value="slot.Quantity" min="0" />
+                                        </td>
+                                        <td class="text-center">
+                                            @if (requestModel.Slots.Count > 1)
+                                            {
+                                                <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => RemoveSlot(index)" title="Hapus Slot">
+                                                    Hapus
+                                                </button>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-primary" disabled="@isLoading">
+                        @if (isLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            <span>Memproses...</span>
+                        }
+                        else
+                        {
+                            <span>Process Planning</span>
+                        }
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary ms-2" @onclick="ResetForm" disabled="@isLoading">
+                        Reset Form
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+
+    @if (resultPlanning != null)
+    {
+        <div class="card border-success">
+            <div class="card-header bg-success text-white fw-bold d-flex justify-content-between align-items-center">
+                <span>Hasil Balancing Rencana Produksi</span>
+                <span class="badge bg-light text-dark">ID: @resultPlanning.PlanningId</span>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <small class="text-muted d-block">Request Code</small>
+                        <span class="fw-bold fs-6">@resultPlanning.RequestCode</span>
+                    </div>
+                    <div class="col-md-3">
+                        <small class="text-muted d-block">Status</small>
+                        <span class="badge bg-primary">@resultPlanning.Status</span>
+                    </div>
+                    <div class="col-md-3">
+                        <small class="text-muted d-block">Original Total</small>
+                        <span class="fw-bold fs-6 text-secondary">@resultPlanning.Slots.Sum(s => s.OriginalQuantity)</span>
+                    </div>
+                    <div class="col-md-3">
+                        <small class="text-muted d-block">Balanced Total</small>
+                        <span class="fw-bold fs-6 text-success">@resultPlanning.Slots.Sum(s => s.BalancedQuantity)</span>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-striped table-bordered align-middle">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Order</th>
+                                <th>Nama Slot</th>
+                                <th class="text-end">Original Quantity</th>
+                                <th class="text-end">Balanced Quantity</th>
+                                <th class="text-center">Status Slot</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var slot in resultPlanning.Slots.OrderBy(s => s.SlotOrder))
+                            {
+                                <tr class="@(!slot.IsActive ? "table-secondary text-muted" : "")">
+                                    <td>@slot.SlotOrder</td>
+                                    <td class="fw-bold">@slot.SlotName</td>
+                                    <td class="text-end">@slot.OriginalQuantity</td>
+                                    <td class="text-end fw-bold text-success">@slot.BalancedQuantity</td>
+                                    <td class="text-center">
+                                        @if (slot.IsActive)
+                                        {
+                                            <span class="badge bg-success">Aktif</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Tidak Aktif (0)</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot class="table-light fw-bold">
+                            <tr>
+                                <td colspan="2">TOTAL</td>
+                                <td class="text-end">@resultPlanning.Slots.Sum(s => s.OriginalQuantity)</td>
+                                <td class="text-end text-success">@resultPlanning.Slots.Sum(s => s.BalancedQuantity)</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <div class="mt-3">
+                    <button class="btn btn-sm btn-outline-primary" @onclick="GoToHistory">
+                        Lihat di Riwayat Planning &rarr;
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private CreatePlanningRequest requestModel = new();
+    private PlanningResponse? resultPlanning;
+    private string? errorMessage;
+    private bool isLoading;
+
+    protected override void OnInitialized()
+    {
+        InitializeDefaultSlots();
+    }
+
+    private void InitializeDefaultSlots()
+    {
+        requestModel = new CreatePlanningRequest
+        {
+            RequestCode = $"REQ-{DateTime.Now:yyyyMMdd-HHmmss}",
+            Slots = new List<SlotRequest>
+            {
+                new SlotRequest { SlotName = "Slot 1", Quantity = 4 },
+                new SlotRequest { SlotName = "Slot 2", Quantity = 5 },
+                new SlotRequest { SlotName = "Slot 3", Quantity = 1 },
+                new SlotRequest { SlotName = "Slot 4", Quantity = 7 },
+                new SlotRequest { SlotName = "Slot 5", Quantity = 6 },
+                new SlotRequest { SlotName = "Slot 6", Quantity = 4 },
+                new SlotRequest { SlotName = "Slot 7", Quantity = 0 }
+            }
+        };
+    }
+
+    private void AddSlot()
+    {
+        requestModel.Slots.Add(new SlotRequest
+        {
+            SlotName = $"Slot {requestModel.Slots.Count + 1}",
+            Quantity = 0
+        });
+    }
+
+    private void RemoveSlot(int index)
+    {
+        if (requestModel.Slots.Count > 1 && index >= 0 && index < requestModel.Slots.Count)
+        {
+            requestModel.Slots.RemoveAt(index);
+        }
+    }
+
+    private void ResetForm()
+    {
+        resultPlanning = null;
+        errorMessage = null;
+        InitializeDefaultSlots();
+    }
+
+    private async Task HandleSubmitAsync()
+    {
+        errorMessage = null;
+        resultPlanning = null;
+
+        if (string.IsNullOrWhiteSpace(requestModel.RequestCode))
+        {
+            errorMessage = "RequestCode wajib diisi.";
+            return;
+        }
+
+        if (requestModel.Slots == null || requestModel.Slots.Count == 0)
+        {
+            errorMessage = "Minimal 1 slot produksi harus tersedia.";
+            return;
+        }
+
+        for (int i = 0; i < requestModel.Slots.Count; i++)
+        {
+            if (string.IsNullOrWhiteSpace(requestModel.Slots[i].SlotName))
+            {
+                errorMessage = $"Nama slot baris ke-{i + 1} tidak boleh kosong.";
+                return;
+            }
+            if (requestModel.Slots[i].Quantity < 0)
+            {
+                errorMessage = $"Quantity slot baris ke-{i + 1} tidak boleh negatif.";
+                return;
+            }
+        }
+
+        isLoading = true;
+
+        try
+        {
+            var response = await ApiClient.CreatePlanningAsync(requestModel);
+            if (response.IsSuccess && response.Data != null)
+            {
+                resultPlanning = response.Data;
+            }
+            else
+            {
+                errorMessage = response.ErrorMessage ?? "Gagal memproses rencana produksi.";
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void GoToHistory()
+    {
+        Navigation.NavigateTo("history");
+    }
+}
