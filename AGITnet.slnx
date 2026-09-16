@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AGITnet.Api/AGITnet.Api.csproj" />
+    <Project Path="src/AGITnet.Application/AGITnet.Application.csproj" />
+    <Project Path="src/AGITnet.Domain/AGITnet.Domain.csproj" />
+    <Project Path="src/AGITnet.Infrastructure/AGITnet.Infrastructure.csproj" />
+    <Project Path="src/AGITnet.Web/AGITnet.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AGITnet.IntegrationTests/AGITnet.IntegrationTests.csproj" />
+    <Project Path="tests/AGITnet.UnitTests/AGITnet.UnitTests.csproj" />
+  </Folder>
+</Solution>
