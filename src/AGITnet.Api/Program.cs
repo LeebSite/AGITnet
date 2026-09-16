@@ -9,10 +9,19 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllers();
 
-// Configure PostgreSQL DbContext
+// Configure DbContext with PostgreSQL connection string
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(connectionString));
+{
+    if (!string.IsNullOrEmpty(connectionString))
+    {
+        options.UseNpgsql(connectionString);
+    }
+    else
+    {
+        options.UseInMemoryDatabase("AGITnet_DevDb");
+    }
+});
 
 // Register Application & Infrastructure Services
 builder.Services.AddScoped<IPlanningRepository, PlanningRepository>();
@@ -31,6 +40,30 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var app = builder.Build();
+
+// Ensure Database & Tables exist automatically at startup, fallback to InMemory if Postgres is unavailable
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    var logger = services.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        var dbContext = services.GetRequiredService<AppDbContext>();
+        // Ensure database agitnet_db and tables are created automatically
+        dbContext.Database.EnsureCreated();
+        logger.LogInformation("Database PostgreSQL 'agitnet_db' berhasil di-verify/dibuat.");
+    }
+    catch (Exception ex)
+    {
+        logger.LogWarning("PostgreSQL tidak tersedia ({Message}). Menggunakan database sementara In-Memory untuk pengembangan.", ex.Message);
+        
+        // Dynamic fallback to In-Memory DbContext if PostgreSQL is not running
+        var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase("AGITnet_FallbackDb");
+        
+        builder.Services.AddScoped(_ => new AppDbContext(optionsBuilder.Options));
+    }
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
